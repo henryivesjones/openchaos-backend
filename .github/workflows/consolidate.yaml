@@ -1,0 +1,46 @@
+name: Consolidate Partials
+
+on:
+    schedule:
+        # Runs every 5 minutes
+        - cron: "*/5 * * * *"
+    workflow_dispatch: # Allows manual triggering
+
+jobs:
+    consolidate:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Consolidate partial files
+              run: |
+                  TOTAL=0
+
+                  # Find all partial files
+                  for file in partials/*; do
+                    if [ -f "$file" ]; then
+                      value=$(cat "$file")
+                      TOTAL=$((TOTAL + value))
+                      echo "Adding $value from $file"
+                    fi
+                  done
+
+                  echo "Consolidated total: $TOTAL"
+
+                  # Save consolidated total (adjust path as needed)
+                  echo $TOTAL > consolidated_total.txt
+
+                  # Delete all partial files
+                  rm -rf partials/*
+
+            - name: Commit changes
+              run: |
+                  git config --local user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --local user.name "github-actions[bot]"
+                  git add .
+                  git commit -m "Consolidate partial files [automated]" || echo "No changes to commit"
+                  git push
