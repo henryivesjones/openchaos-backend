@@ -6,10 +6,12 @@ on:
         - cron: "*/5 * * * *"
     workflow_dispatch: # Allows manual triggering
 
+permissions:
+    contents: write
+
 jobs:
     consolidate:
         runs-on: ubuntu-latest
-
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
@@ -18,21 +20,37 @@ jobs:
 
             - name: Consolidate partial files
               run: |
-                  TOTAL=0
+                  SUBTOTAL=0
 
                   # Find all partial files
                   for file in partials/*; do
                     if [ -f "$file" ]; then
                       value=$(cat "$file")
-                      TOTAL=$((TOTAL + value))
+                      SUBTOTAL=$((SUBTOTAL + value))
                       echo "Adding $value from $file"
                     fi
                   done
 
-                  echo "Consolidated total: $TOTAL"
+                  echo "Subtotal from partials: $SUBTOTAL"
 
-                  # Save consolidated total (adjust path as needed)
-                  echo $TOTAL > consolidated_total.txt
+                  if [ $SUBTOTAL -eq 0 ]; then
+                    echo "No files to consolidate"
+                    exit 0
+                  fi
+
+                  # Read existing total (default to 0 if file doesn't exist)
+                  EXISTING_TOTAL=0
+                  if [ -f "consolidated_total.txt" ]; then
+                    EXISTING_TOTAL=$(cat consolidated_total.txt)
+                  fi
+
+                  # Calculate new total
+                  NEW_TOTAL=$((EXISTING_TOTAL + SUBTOTAL))
+                  echo "Existing total: $EXISTING_TOTAL"
+                  echo "New total: $NEW_TOTAL"
+
+                  # Save new total
+                  echo $NEW_TOTAL > consolidated_total.txt
 
                   # Delete all partial files
                   rm -rf partials/*
@@ -42,5 +60,5 @@ jobs:
                   git config --local user.email "github-actions[bot]@users.noreply.github.com"
                   git config --local user.name "github-actions[bot]"
                   git add .
-                  git commit -m "Consolidate partial files [automated]" || echo "No changes to commit"
+                  git diff --staged --quiet || git commit -m "Consolidate partials: added $SUBTOTAL to total [automated]"
                   git push
